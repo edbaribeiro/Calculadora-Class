@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Jornada - Calendário</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+
+        const MONTH_NAMES = [
+            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+        ];
+
+        const WEEKDAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+        function pad(n) { return String(n).padStart(2, "0"); }
+
+        function dateKey(year, month, day) {
+            return `${year}-${pad(month + 1)}-${pad(day)}`;
+        }
+
+        function daysInMonth(year, month) {
+            return new Date(year, month + 1, 0).getDate();
+        }
+
+        function firstWeekday(year, month) {
+            return new Date(year, month, 1).getDay();
+        }
+
+        function App() {
+            const today = new Date();
+            const [viewYear, setViewYear] = useState(today.getFullYear());
+            const [viewMonth, setViewMonth] = useState(today.getMonth());
+            const [selectedDates, setSelectedDates] = useState(new Set());
+            const [startTime, setStartTime] = useState("08:00");
+            const [endTime, setEndTime] = useState("17:00");
+            const [extraMinutes, setExtraMinutes] = useState(0);
+            const [classesPerWeek, setClassesPerWeek] = useState(1);
+            const [fullHourMinutes, setFullHourMinutes] = useState(30);
+
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+
+            const totalDays = daysInMonth(viewYear, viewMonth);
+            const startWeekday = firstWeekday(viewYear, viewMonth);
+
+            const toggleDay = (day) => {
+                const key = dateKey(viewYear, viewMonth, day);
+                const next = new Set(selectedDates);
+                if (next.has(key)) next.delete(key); else next.add(key);
+                setSelectedDates(next);
+            };
+
+            const weekdayFullySelected = (weekdayIndex) => {
+                for (let d = 1; d <= totalDays; d++) {
+                    const jsDay = new Date(viewYear, viewMonth, d).getDay();
+                    if (jsDay === weekdayIndex) {
+                        const key = dateKey(viewYear, viewMonth, d);
+                        if (!selectedDates.has(key)) return false;
+                    }
+                }
+                return true;
+            };
+
+            const toggleWeekday = (weekdayIndex) => {
+                const shouldSelect = !weekdayFullySelected(weekdayIndex);
+                const next = new Set(selectedDates);
+                for (let d = 1; d <= totalDays; d++) {
+                    const jsDay = new Date(viewYear, viewMonth, d).getDay();
+                    if (jsDay === weekdayIndex) {
+                        const key = dateKey(viewYear, viewMonth, d);
+                        if (shouldSelect) next.add(key); else next.delete(key);
+                    }
+                }
+                setSelectedDates(next);
+            };
+
+            const changeMonth = (delta) => {
+                let m = viewMonth + delta;
+                let y = viewYear;
+                if (m < 0) { m = 11; y -= 1; }
+                if (m > 11) { m = 0; y += 1; }
+                setViewMonth(m);
+                setViewYear(y);
+            };
+
+            const clearMonth = () => {
+                const next = new Set(selectedDates);
+                for (let d = 1; d <= totalDays; d++) {
+                    next.delete(dateKey(viewYear, viewMonth, d));
+                }
+                setSelectedDates(next);
+            };
+
+            const calculation = useMemo(() => {
+                const [sH, sM] = startTime.split(":").map(Number);
+                const [eH, eM] = endTime.split(":").map(Number);
+                const rawMinutesPerDay = (eH * 60 + eM) - (sH * 60 + sM);
+                const validRaw = rawMinutesPerDay > 0 ? rawMinutesPerDay : 0;
+
+                const extra = Number(extraMinutes) || 0;
+                let hourBlocks = 0;
+                if (validRaw > 0) {
+                    hourBlocks = Math.floor(validRaw / 60);
+                    if (hourBlocks < 1) hourBlocks = 1;
+                }
+                const adjustedMinutesPerDay = validRaw + hourBlocks * extra;
+
+                const dayCount = selectedDates.size;
+                const totalRawMinutes = validRaw * dayCount;
+                const totalAdjustedMinutes = adjustedMinutesPerDay * dayCount;
+
+                const classes = Number(classesPerWeek) || 0;
+                const weeklyLoadMinutes = adjustedMinutesPerDay * classes;
+                const weeklyLoadX45Minutes = weeklyLoadMinutes * 4.5;
+
+                const fullHourRate = Number(fullHourMinutes) || 0;
+                const fullHoursPerDay = Math.floor(validRaw / 60);
+                const fullHourAdditionPerDay = fullHoursPerDay * fullHourRate;
+                const fullHourAdditionTotal = fullHourAdditionPerDay * dayCount;
+
+                const getFormats = (mins) => {
+                    const h = Math.floor(mins / 60);
+                    const m = Math.round(mins % 60);
+                    const decimal = (mins / 60).toFixed(2).replace(".", ",");
+                    return {
+                        clock: `${h}h ${String(m).padStart(2, "0")}m`,
+                        decimal: decimal,
+                    };
+                };
+
+                return {
+                    dayCount,
+                    perDayRaw: getFormats(validRaw),
+                    perDayAdjusted: getFormats(adjustedMinutesPerDay),
+                    totalRaw: getFormats(totalRawMinutes),
+                    totalAdjusted: getFormats(totalAdjustedMinutes),
+                    weeklyLoad: getFormats(weeklyLoadMinutes),
+                    weeklyLoadX45: getFormats(weeklyLoadX45Minutes),
+                    fullHourAdditionPerDay: getFormats(fullHourAdditionPerDay),
+                    fullHourAdditionTotal: getFormats(fullHourAdditionTotal),
+                };
+            }, [selectedDates, startTime, endTime, extraMinutes, classesPerWeek, fullHourMinutes]);
+
+            const cells = [];
+            for (let i = 0; i < startWeekday; i++) cells.push(null);
+            for (let d = 1; d <= totalDays; d++) cells.push(d);
+
+            return (
+                <div className="min-h-screen py-10 px-4">
+                    <div className="max-w-2xl mx-auto">
+                        <header className="text-center mb-8">
+                            <h1 className="text-3xl font-black text-indigo-600 tracking-tight uppercase italic">Cálculo de Horas Class</h1>
+                            <p className="text-slate-400 text-sm font-medium">Selecione os dias no calendário e calcule automaticamente</p>
+                        </header>
+
+                        <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden">
+                            <div className="bg-slate-900 p-8 text-white">
+                                <div className="flex items-center justify-between mb-6">
+                                    <button onClick={() => changeMonth(-1)} className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-all">
+                                        <i data-lucide="chevron-left" className="w-4 h-4"></i>
+                                    </button>
+
+                                    <div className="flex items-center gap-2">
+                                        <select value={viewMonth} onChange={(e) => setViewMonth(Number(e.target.value))}
+                                            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500">
+                                            {MONTH_NAMES.map((name, idx) => <option key={idx} value={idx}>{name}</option>)}
+                                        </select>
+                                        <input type="number" value={viewYear}
+                                            onChange={(e) => setViewYear(Number(e.target.value))}
+                                            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-indigo-500" />
+                                    </div>
+
+                                    <button onClick={() => changeMonth(1)} className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-all">
+                                        <i data-lucide="chevron-right" className="w-4 h-4"></i>
+                                    </button>
+                                </div>
+
+                                <label className="text-[10px] font-bold uppercase text-indigo-400 tracking-widest block mb-3">Selecionar por dia da semana</label>
+                                <div className="flex gap-2 flex-wrap">
+                                    {WEEKDAY_LABELS.map((label, idx) => (
+                                        <button key={idx} onClick={() => toggleWeekday(idx)}
+                                            className={`px-3 h-9 rounded-xl text-xs font-bold transition-all ${weekdayFullySelected(idx) ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/40" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}>
+                                            {label}
+                                        </button>
+                                    ))}
+                                    <button onClick={clearMonth}
+                                        className="px-3 h-9 rounded-xl text-xs font-bold bg-slate-800 text-rose-300 hover:bg-slate-700 transition-all">
+                                        Limpar mês
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="p-8">
+                                <div className="grid grid-cols-7 gap-2 mb-2">
+                                    {WEEKDAY_LABELS.map((label) => (
+                                        <div key={label} className="text-center text-[10px] font-bold uppercase text-slate-400 tracking-wider">{label}</div>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-7 gap-2">
+                                    {cells.map((day, idx) => {
+                                        if (day === null) return <div key={idx}></div>;
+                                        const key = dateKey(viewYear, viewMonth, day);
+                                        const isSelected = selectedDates.has(key);
+                                        const isToday = key === dateKey(today.getFullYear(), today.getMonth(), today.getDate());
+                                        return (
+                                            <button key={idx} onClick={() => toggleDay(day)}
+                                                className={`aspect-square rounded-xl text-sm font-bold transition-all flex items-center justify-center
+                                                    ${isSelected ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 scale-105" : "bg-slate-50 text-slate-600 hover:bg-slate-100"}
+                                                    ${isToday && !isSelected ? "ring-2 ring-indigo-300" : ""}`}>
+                                                {day}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-8">
+                                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 min-w-0">
+                                        <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest block mb-2">Início</label>
+                                        <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
+                                            className="bg-white border border-slate-200 rounded-xl px-2 py-2 w-full min-w-0 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500" />
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 min-w-0">
+                                        <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest block mb-2">Término</label>
+                                        <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
+                                            className="bg-white border border-slate-200 rounded-xl px-2 py-2 w-full min-w-0 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500" />
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 min-w-0">
+                                        <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest block mb-2">Minutos adicionais / hora</label>
+                                        <input type="number" step="1" value={extraMinutes} onChange={(e) => setExtraMinutes(e.target.value)}
+                                            className="bg-white border border-slate-200 rounded-xl px-2 py-2 w-full min-w-0 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500" />
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 min-w-0">
+                                        <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest block mb-2">Aulas por semana</label>
+                                        <input type="number" step="1" min="0" value={classesPerWeek} onChange={(e) => setClassesPerWeek(e.target.value)}
+                                            className="bg-white border border-slate-200 rounded-xl px-2 py-2 w-full min-w-0 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500" />
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 min-w-0">
+                                        <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest block mb-2">Minutos / hora cheia</label>
+                                        <input type="number" step="1" min="0" value={fullHourMinutes} onChange={(e) => setFullHourMinutes(e.target.value)}
+                                            className="bg-white border border-slate-200 rounded-xl px-2 py-2 w-full min-w-0 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500" />
+                                    </div>
+                                </div>
+
+                                <div className="text-center mt-6 mb-2">
+                                    <span className="inline-block bg-slate-100 text-slate-500 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full">
+                                        {calculation.dayCount} dia{calculation.dayCount === 1 ? "" : "s"} selecionado{calculation.dayCount === 1 ? "" : "s"}
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                                    <div className="bg-slate-800 rounded-[2rem] p-6 text-white shadow-xl">
+                                        <p className="font-bold text-[10px] uppercase tracking-wider mb-4 opacity-70">Por dia (bruto / c/ adicional)</p>
+                                        <div className="space-y-1">
+                                            <h2 className="text-2xl font-black">{calculation.perDayRaw.clock} <span className="text-slate-400 text-base font-bold">→</span> {calculation.perDayAdjusted.clock}</h2>
+                                            <p className="text-slate-300 font-medium text-sm italic">{calculation.perDayRaw.decimal} → {calculation.perDayAdjusted.decimal} (decimal)</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-emerald-500 rounded-[2rem] p-6 text-white shadow-xl shadow-emerald-100">
+                                        <p className="font-bold text-[10px] uppercase tracking-wider mb-4 opacity-70">Total do período (c/ adicional)</p>
+                                        <div className="space-y-1">
+                                            <h2 className="text-4xl font-black">{calculation.totalAdjusted.clock}</h2>
+                                            <p className="text-emerald-100 font-medium text-lg italic">{calculation.totalAdjusted.decimal} (decimal)</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 bg-violet-600 rounded-[2rem] p-6 text-white shadow-xl shadow-violet-100">
+                                    <p className="font-bold text-[10px] uppercase tracking-wider mb-4 opacity-70">Carga horária semanal ({classesPerWeek || 0} aula{Number(classesPerWeek) === 1 ? "" : "s"}/semana) × 4,5</p>
+                                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                                        <div>
+                                            <p className="text-violet-200 text-[10px] font-bold uppercase tracking-wider mb-1">Semanal</p>
+                                            <h3 className="text-2xl font-black">{calculation.weeklyLoad.clock}</h3>
+                                            <p className="text-violet-200 font-medium text-sm italic">{calculation.weeklyLoad.decimal} (decimal)</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-violet-200 text-[10px] font-bold uppercase tracking-wider mb-1">Semanal × 4,5</p>
+                                            <h2 className="text-4xl font-black">{calculation.weeklyLoadX45.clock}</h2>
+                                            <p className="text-violet-100 font-medium text-lg italic">{calculation.weeklyLoadX45.decimal} (decimal)</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 bg-amber-500 rounded-[2rem] p-6 text-white shadow-xl shadow-amber-100">
+                                    <p className="font-bold text-[10px] uppercase tracking-wider mb-4 opacity-70">Adicional por hora cheia ({fullHourMinutes || 0} min / hora, s/ minutos adicionais)</p>
+                                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                                        <div>
+                                            <p className="text-amber-100 text-[10px] font-bold uppercase tracking-wider mb-1">Por dia</p>
+                                            <h3 className="text-2xl font-black">{calculation.fullHourAdditionPerDay.clock}</h3>
+                                            <p className="text-amber-100 font-medium text-sm italic">{calculation.fullHourAdditionPerDay.decimal} (decimal)</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-amber-100 text-[10px] font-bold uppercase tracking-wider mb-1">Total do período</p>
+                                            <h2 className="text-4xl font-black">{calculation.fullHourAdditionTotal.clock}</h2>
+                                            <p className="text-amber-50 font-medium text-lg italic">{calculation.fullHourAdditionTotal.decimal} (decimal)</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(<App />);
+    </script>
+</body>
+</html>
