@@ -301,18 +301,18 @@
                                     </div>
                                 </div>
 
-                                <div className="mt-6 bg-amber-500 rounded-[2rem] p-6 text-white shadow-xl shadow-amber-100">
-                                    <p className="font-bold text-[10px] uppercase tracking-wider mb-4 opacity-70">Horas de Preparação HS ({fullHourMinutes || 0} min / hora, s/ minutos adicionais)</p>
+                                <div className="mt-6 bg-blue-600 rounded-[2rem] p-6 text-white shadow-xl shadow-blue-100">
+                                    <p className="font-bold text-[10px] uppercase tracking-wider mb-4 opacity-70">Adicional por hora cheia ({fullHourMinutes || 0} min / hora, s/ minutos adicionais)</p>
                                     <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                                         <div>
-                                            <p className="text-amber-100 text-[10px] font-bold uppercase tracking-wider mb-1">Por dia</p>
+                                            <p className="text-blue-100 text-[10px] font-bold uppercase tracking-wider mb-1">Por dia</p>
                                             <h3 className="text-2xl font-black">{calculation.fullHourAdditionPerDay.clock}</h3>
-                                            <p className="text-amber-100 font-medium text-sm italic">{calculation.fullHourAdditionPerDay.decimal} (decimal)</p>
+                                            <p className="text-blue-100 font-medium text-sm italic">{calculation.fullHourAdditionPerDay.decimal} (decimal)</p>
                                         </div>
                                         <div>
-                                            <p className="text-amber-100 text-[10px] font-bold uppercase tracking-wider mb-1">Total do período</p>
+                                            <p className="text-blue-100 text-[10px] font-bold uppercase tracking-wider mb-1">Total do período</p>
                                             <h2 className="text-4xl font-black">{calculation.fullHourAdditionTotal.clock}</h2>
-                                            <p className="text-amber-50 font-medium text-lg italic">{calculation.fullHourAdditionTotal.decimal} (decimal)</p>
+                                            <p className="text-blue-50 font-medium text-lg italic">{calculation.fullHourAdditionTotal.decimal} (decimal)</p>
                                         </div>
                                     </div>
                                 </div>
